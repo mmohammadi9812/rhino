@@ -5,10 +5,8 @@ version = "0.0.1"
 authors = ["Markus Westerlind <marwes91@gmail.com>"]
 
 [[bin]]
-
 name = "haskell-compiler"
 path = "src/main.rs"
 
 [dependencies]
-log = "0.3.6"
-getopts = "0.2.14"
+getopts = "0.2"

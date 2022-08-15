@@ -1,0 +1,9 @@
+{
+    "rust-analyzer.diagnostics.disabled": [
+        "inactive-code"
+    ],
+    "rust-analyzer.diagnostics.warningsAsHint": [
+        "dead_code",
+        "unused_variables"
+    ]
+}
