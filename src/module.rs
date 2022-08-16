@@ -7,6 +7,7 @@ pub use types::*;
 
 use self::Expr::*;
 
+
 #[derive(Clone, Debug)]
 pub struct Module<Ident = InternedStr> {
     pub name: Ident,
@@ -221,7 +222,7 @@ impl<T: fmt::Display + AsRef<str>> fmt::Display for Binding<T> {
 
 impl<T: fmt::Display + AsRef<str>> fmt::Display for Expr<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write_core_expr!(*self, f, _)?;
+        macros::write_core_expr!(*self, f, _)?;
         match *self {
             Do(ref bindings, ref expr) => {
                 write!(f, "do {{\n")?;
@@ -593,4 +594,34 @@ pub fn encode_binding_identifier(
     buffer.push_str(&instancename);
     buffer.push_str(&bindingname);
     intern(buffer.as_ref())
+}
+
+pub mod macros {
+    #[macro_export]
+    macro_rules! write_core_expr(
+        ($e:expr, $f:expr, $($p:pat),*) => ({
+            match $e {
+                self::Expr::Identifier(ref s) => write!($f, "{}", *s),
+                self::Expr::Apply(ref func, ref arg) => write!($f, "({} {})", func, *arg),
+                self::Expr::Literal(ref l) => write!($f, "{}", *l),
+                self::Expr::Lambda(ref arg, ref body) => write!($f, "({} -> {})", *arg, *body),
+                self::Expr::Let(ref bindings, ref body) => {
+                    write!($f, "let {{\n")?;
+                    for bind in bindings.iter() {
+                        write!($f, "; {}\n", bind)?;
+                    }
+                    write!($f, "}} in {}\n", *body)
+                }
+                self::Expr::Case(ref expr, ref alts) => {
+                    write!($f, "case {} of {{\n", *expr)?;
+                    for alt in alts.iter() {
+                        write!($f, "; {}\n", alt)?;
+                    }
+                    write!($f, "}}\n")
+                }
+                $($p => Ok(()))*
+            }
+        })
+    );
+    pub use write_core_expr;
 }

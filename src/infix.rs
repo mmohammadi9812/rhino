@@ -95,7 +95,7 @@ impl PrecedenceVisitor {
                                             reduce(&mut expr_stack, &mut op_stack);
                                         }
                                         (Assoc::Right, Assoc::Right) => {
-                                            dbg!("Shift op {:?}", op);
+                                            tracing::debug!("Shift op {:?}", op);
                                             op_stack.push(op);
                                             break;
                                         }
@@ -132,73 +132,3 @@ impl PrecedenceVisitor {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use infix::PrecedenceVisitor;
-    use interner::intern;
-    use module::*;
-    use parser::*;
-    use renamer::tests::{rename_expr, rename_modules};
-    use typecheck::*;
-
-    #[test]
-    fn operator_precedence() {
-        let m = parse_string(
-            r"import Prelude
-test = 3 * 4 - 5 * 6",
-        )
-        .unwrap();
-        let mut modules = rename_modules(m);
-        let mut v = PrecedenceVisitor::new();
-        for module in modules.iter_mut() {
-            v.visit_module(module);
-        }
-        assert_eq!(
-            modules.last().unwrap().bindings[0].matches,
-            Match::Simple(rename_expr(op_apply(
-                op_apply(number(3), intern("*"), number(4)),
-                intern("-"),
-                op_apply(number(5), intern("*"), number(6))
-            )))
-        );
-    }
-    #[test]
-    fn operator_precedence_parens() {
-        let m = parse_string(
-            r"import Prelude
-test = 3 * 4 * (5 - 6)",
-        )
-        .unwrap();
-        let mut modules = rename_modules(m);
-        let mut v = PrecedenceVisitor::new();
-        for module in modules.iter_mut() {
-            v.visit_module(module);
-        }
-        assert_eq!(
-            modules.last().unwrap().bindings[0].matches,
-            Match::Simple(rename_expr(op_apply(
-                op_apply(number(3), intern("*"), number(4)),
-                intern("*"),
-                paren(op_apply(number(5), intern("-"), number(6)))
-            )))
-        );
-    }
-
-    #[test]
-    fn rewrite_operators() {
-        let mut expr = rename_expr(op_apply(
-            number(1),
-            intern("*"),
-            op_apply(number(2), intern("+"), number(3)),
-        ));
-        PrecedenceVisitor::new().visit_expr(&mut expr);
-        assert_eq!(
-            expr,
-            rename_expr(op_apply(
-                op_apply(number(1), intern("*"), number(2)),
-                intern("+"),
-                number(3)
-            ))
-        );
-    }
-}

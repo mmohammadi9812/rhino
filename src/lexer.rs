@@ -113,7 +113,7 @@ impl Token {
         }
     }
 
-    fn new(
+    pub fn new(
         interner: &Rc<RefCell<Interner>>,
         token: TokenEnum,
         value: &str,
@@ -124,20 +124,6 @@ impl Token {
             value: (**interner).borrow_mut().intern(value),
             location: loc,
         }
-    }
-
-    #[cfg(test)]
-    fn new_(token: TokenEnum, value: &str) -> Token {
-        Token::new(
-            &get_local_interner(),
-            token,
-            value,
-            Location {
-                column: -1,
-                row: -1,
-                absolute: -1,
-            },
-        )
     }
 }
 
@@ -380,7 +366,7 @@ impl<Stream: Iterator<Item = char>> Lexer<Stream> {
                 let m = *self.indent_levels.last().unwrap();
                 if m != 0 {
                     //If not a explicit '}'
-                    dbg!(
+                    tracing::debug!(
                         "ParseError on token {:?}, inserting }}",
                         self.current().token
                     );
@@ -438,7 +424,7 @@ impl<Stream: Iterator<Item = char>> Lexer<Stream> {
                         let m = *self.indent_levels.last().unwrap();
                         //m == n
                         if m == tok.location.column {
-                            dbg!("Indents are same, inserted semicolon");
+                            tracing::debug!("Indents are same, inserted semicolon");
                             self.tokens.push_back(Token::new(
                                 &self.interner,
                                 SEMICOLON,
@@ -450,7 +436,7 @@ impl<Stream: Iterator<Item = char>> Lexer<Stream> {
                         } else if tok.location.column < m {
                             //n < m
                             //TODO:
-                            dbg!("n < m, insert }}");
+                            tracing::debug!("n < m, insert }}");
                             self.indent_levels.pop();
                             self.tokens.push_back(Token::new(
                                 &self.interner,
@@ -476,7 +462,7 @@ impl<Stream: Iterator<Item = char>> Lexer<Stream> {
                         //m:ms
                         let m = *self.indent_levels.last().unwrap();
                         if n > m {
-                            dbg!("n > m + INDENTSTART, insert {{");
+                            tracing::debug!("n > m + INDENTSTART, insert {{");
                             self.unprocessed_tokens.pop();
                             self.tokens.push_back(Token::new(
                                 &self.interner,
@@ -655,35 +641,3 @@ impl<Stream: Iterator<Item = char>> Lexer<Stream> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-
-    use lexer::*;
-
-    #[test]
-    fn simple() {
-        let mut lexer = Lexer::new("test 2 + 3".chars());
-
-        assert_eq!(*lexer.next(), Token::new_(NAME, "test"));
-        assert_eq!(*lexer.next(), Token::new_(NUMBER, "2"));
-        assert_eq!(*lexer.next(), Token::new_(OPERATOR, "+"));
-        assert_eq!(*lexer.next(), Token::new_(NUMBER, "3"));
-    }
-    #[test]
-    fn let_bind() {
-        let mut lexer = Lexer::new(
-            r"let
-    test = 2 + 3
-in test"
-                .chars(),
-        );
-
-        assert_eq!(*lexer.next(), Token::new_(LET, "let"));
-        assert_eq!(*lexer.next(), Token::new_(LBRACE, "{"));
-        assert_eq!(*lexer.next(), Token::new_(NAME, "test"));
-        assert_eq!(*lexer.next(), Token::new_(EQUALSSIGN, "="));
-        assert_eq!(*lexer.next(), Token::new_(NUMBER, "2"));
-        assert_eq!(*lexer.next(), Token::new_(OPERATOR, "+"));
-        assert_eq!(*lexer.next(), Token::new_(NUMBER, "3"));
-    }
-}

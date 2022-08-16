@@ -511,7 +511,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_binding(&mut self, bind: &Binding<Id>) -> SuperCombinator {
-        dbg!("Compiling binding {:?} :: {:?}", &bind.name, &bind.name.typ);
+        tracing::debug!("Compiling binding {:?} :: {:?}", &bind.name, &bind.name.typ);
         let dict_arg = if bind.name.typ.constraints.len() > 0 {
             1
         } else {
@@ -527,7 +527,7 @@ impl<'a> Compiler<'a> {
                     uid: 0,
                 });
             }
-            dbg!("{:?} {:?}\n {:?}", &bind.name, dict_arg, &bind.expression);
+            tracing::debug!("{:?} {:?}\n {:?}", &bind.name, dict_arg, &bind.expression);
             arity = this.compile_lambda_binding(&bind.expression, &mut instructions) + dict_arg;
             instructions.push(Update(0));
             if arity != 0 {
@@ -535,7 +535,7 @@ impl<'a> Compiler<'a> {
             }
             instructions.push(Unwind);
         });
-        dbg!(
+        tracing::debug!(
             "{:?} :: {:?} compiled as:\n{:?}",
             &bind.name,
             &bind.name.typ,
@@ -850,7 +850,7 @@ impl<'a> Compiler<'a> {
                         instructions.push(PushBuiltin(index));
                     }
                     Var::Class(typ, constraints, var) => {
-                        dbg!(
+                        tracing::debug!(
                             "Var::Class ({:?}, {:?}, {:?}) {:?}",
                             typ,
                             constraints,
@@ -867,7 +867,7 @@ impl<'a> Compiler<'a> {
                         );
                     }
                     Var::Constraint(index, bind_type, constraints) => {
-                        dbg!(
+                        tracing::debug!(
                             "Var::Constraint {:?} ({:?}, {:?}, {:?})",
                             name,
                             index,
@@ -1038,7 +1038,7 @@ impl<'a> Compiler<'a> {
         constraints: &[(Name, Type<Name>)],
         instructions: &mut Vec<Instruction>,
     ) {
-        dbg!("Push dictionary {:?} ==> {:?}", context, constraints);
+        tracing::debug!("Push dictionary {:?} ==> {:?}", context, constraints);
         for &(ref class, ref typ) in constraints.iter() {
             self.fold_dictionary(*class, typ, instructions);
             instructions.push(ConstructDictionary(constraints.len()));
@@ -1055,13 +1055,13 @@ impl<'a> Compiler<'a> {
         match *typ {
             Type::Constructor(ref ctor) => {
                 //Simple
-                dbg!("Simple for {:?}", ctor);
+                tracing::debug!("Simple for {:?}", ctor);
                 //Push static dictionary to the top of the stack
                 let index = self.find_dictionary_index(&[(class.clone(), typ.clone())]);
                 instructions.push(PushDictionary(index));
             }
             Type::Application(ref lhs, ref rhs) => {
-                dbg!("App for ({:?} {:?})", lhs, rhs);
+                tracing::debug!("App for ({:?} {:?})", lhs, rhs);
                 //For function in functions
                 // Mkap function fold_dictionary(rhs)
                 self.fold_dictionary(class, &**lhs, instructions);
@@ -1086,7 +1086,7 @@ impl<'a> Compiler<'a> {
                         .find_class(class)
                         .map(|(_, _, decls)| decls.len())
                         .unwrap();
-                    dbg!(
+                        tracing::debug!(
                         "Use previous dict for {:?} at {:?}..{:?}",
                         var,
                         index,
@@ -1094,7 +1094,7 @@ impl<'a> Compiler<'a> {
                     );
                     instructions.push(PushDictionaryRange(index, num_class_functions));
                 } else {
-                    dbg!("No dict for {:?}", var);
+                    tracing::debug!("No dict for {:?}", var);
                 }
             }
             _ => panic!("Did not expect generic"),
@@ -1211,7 +1211,7 @@ impl<'a> Compiler<'a> {
         instructions: &mut Vec<Instruction>,
         stack_size: usize,
     ) -> usize {
-        dbg!("Pattern {:?} at {:?}", pattern, stack_size);
+        tracing::debug!("Pattern {:?} at {:?}", pattern, stack_size);
         match pattern {
             &Pattern::Constructor(ref name, ref patterns) => {
                 instructions.push(Push(stack_size));
@@ -1318,7 +1318,7 @@ pub fn compile_module(module: &str) -> Result<Vec<Assembly>, ::std::string::Stri
     compile_module_(modules)
 }
 
-fn compile_module_(
+pub fn compile_module_(
     modules: Vec<::module::Module<Name>>,
 ) -> Result<Vec<Assembly>, ::std::string::String> {
     let core_modules: Vec<Module<Id<Name>>> = translate_modules(modules)
@@ -1339,342 +1339,3 @@ fn compile_module_(
     Ok(assemblies)
 }
 
-#[cfg(test)]
-mod tests {
-
-    use compiler::Instruction::*;
-    use compiler::{compile_with_type_env, Assembly, Compiler};
-    use interner::*;
-    use std::fs::File;
-    use std::io::Read;
-    use std::path::Path;
-    use test::Bencher;
-    use typecheck::TypeEnvironment;
-
-    fn compile(contents: &str) -> Assembly {
-        super::compile(contents).unwrap()
-    }
-
-    #[test]
-    fn add() {
-        let file = "main = primIntAdd 1 2";
-        let assembly = compile(file);
-
-        assert_eq!(
-            assembly.super_combinators[0].instructions,
-            vec![PushInt(2), PushInt(1), Add, Update(0), Unwind]
-        );
-    }
-
-    #[test]
-    fn add_double() {
-        let file = r"add x y = primDoubleAdd x y
-main = add 2. 3.";
-        let assembly = compile(file);
-
-        assert_eq!(
-            assembly.super_combinators[0].instructions,
-            vec![
-                Push(1),
-                Eval,
-                Push(0),
-                Eval,
-                DoubleAdd,
-                Update(0),
-                Pop(2),
-                Unwind
-            ]
-        );
-        assert_eq!(
-            assembly.super_combinators[1].instructions,
-            vec![
-                PushFloat(3.),
-                PushFloat(2.),
-                PushGlobal(0),
-                Mkap,
-                Mkap,
-                Eval,
-                Update(0),
-                Unwind
-            ]
-        );
-    }
-    #[test]
-    fn push_num_double() {
-        let file = r"main = primDoubleAdd 2 3";
-        let assembly = compile(file);
-
-        assert_eq!(
-            assembly.super_combinators[0].instructions,
-            vec![PushFloat(3.), PushFloat(2.), DoubleAdd, Update(0), Unwind]
-        );
-    }
-
-    #[test]
-    fn application() {
-        let file = r"add x y = primIntAdd x y
-main = add 2 3";
-        let assembly = compile(file);
-
-        assert_eq!(
-            assembly.super_combinators[1].instructions,
-            vec![
-                PushInt(3),
-                PushInt(2),
-                PushGlobal(0),
-                Mkap,
-                Mkap,
-                Eval,
-                Update(0),
-                Unwind
-            ]
-        );
-    }
-
-    #[test]
-    fn compile_constructor() {
-        let file = r"main = primIntAdd 1 0 : []";
-        let assembly = compile(file);
-
-        assert_eq!(
-            assembly.super_combinators[0].instructions,
-            vec![
-                Pack(0, 0),
-                PushInt(0),
-                PushInt(1),
-                Add,
-                Pack(1, 2),
-                Update(0),
-                Unwind
-            ]
-        );
-    }
-
-    #[test]
-    fn compile_tuple() {
-        let file = r"test x y = (primIntAdd 0 1, x, y)";
-        let assembly = compile(file);
-
-        assert_eq!(
-            assembly.super_combinators[0].instructions,
-            vec![
-                Push(1),
-                Push(0),
-                PushInt(1),
-                PushInt(0),
-                Add,
-                Pack(0, 3),
-                Update(0),
-                Pop(2),
-                Unwind
-            ]
-        );
-    }
-
-    #[test]
-    fn compile_case() {
-        let file = r"main = case [primIntAdd 1 0] of
-    x:xs -> x
-    [] -> 2";
-        let assembly = compile(file);
-
-        assert_eq!(
-            assembly.super_combinators[0].instructions,
-            vec![
-                Pack(0, 0),
-                PushInt(0),
-                PushInt(1),
-                Add,
-                Pack(1, 2),
-                Push(0),
-                CaseJump(1),
-                Jump(14),
-                Split(2),
-                Push(1),
-                Eval,
-                Slide(2),
-                Jump(22),
-                Pop(2),
-                Push(0),
-                CaseJump(0),
-                Jump(22),
-                Split(0),
-                PushInt(2),
-                Slide(0),
-                Jump(22),
-                Pop(0),
-                Slide(1),
-                Eval,
-                Update(0),
-                Unwind
-            ]
-        );
-    }
-
-    #[test]
-    fn compile_class_constraints() {
-        let file = r"class Test a where
-    test :: a -> Int
-
-instance Test Int where
-    test x = x
-
-main = test (primIntAdd 6 0)";
-        let assembly = compile(file);
-
-        let main = &assembly.super_combinators[0];
-        assert_eq!(main.name.name, intern("main"));
-        assert_eq!(
-            main.instructions,
-            vec![
-                PushInt(0),
-                PushInt(6),
-                Add,
-                PushGlobal(1),
-                Mkap,
-                Eval,
-                Update(0),
-                Unwind
-            ]
-        );
-    }
-
-    #[test]
-    fn compile_class_constraints_unknown() {
-        let file = r"class Test a where
-    test :: a -> Int
-
-instance Test Int where
-    test x = x
-
-main x = primIntAdd (test x) 6";
-        let assembly = compile(file);
-
-        let main = &assembly.super_combinators[0];
-        assert_eq!(main.name.name, intern("main"));
-        assert_eq!(
-            main.instructions,
-            vec![
-                PushInt(6),
-                Push(1),
-                PushDictionaryMember(0),
-                Mkap,
-                Eval,
-                Add,
-                Update(0),
-                Pop(2),
-                Unwind
-            ]
-        );
-    }
-
-    #[test]
-    fn compile_prelude() {
-        let prelude;
-        let mut type_env = TypeEnvironment::new();
-        let mut contents = ::std::string::String::new();
-        File::open("Prelude.hs")
-            .and_then(|mut f| f.read_to_string(&mut contents))
-            .unwrap();
-        prelude = compile_with_type_env(&mut type_env, &[], &contents).unwrap();
-
-        let assembly =
-            compile_with_type_env(&mut type_env, &[&prelude], r"main = id (primIntAdd 2 0)")
-                .unwrap();
-
-        let sc = &assembly.super_combinators[0];
-        let id_index = prelude
-            .super_combinators
-            .iter()
-            .position(|sc| sc.name.name == intern("id"))
-            .unwrap();
-        assert_eq!(
-            sc.instructions,
-            vec![
-                PushInt(0),
-                PushInt(2),
-                Add,
-                PushGlobal(id_index),
-                Mkap,
-                Eval,
-                Update(0),
-                Unwind
-            ]
-        );
-    }
-
-    #[test]
-    fn generics_do_not_propagate() {
-        //Test that the type of 'i' does not get overwritten by the use inside the let binding
-        //after typechecking the let binding, retrieving the type for 'i' the second time should
-        //not make the typechecker instantiate a new variable but keep using the original one
-        //This is something the typechecker should notice but for now the compiler will have to do it
-        compile(
-            r"
-class Num a where
-    fromInteger :: Int -> a
-instance Num Int where
-    fromInteger x = x
-class Integral a where
-    rem :: a -> a -> a
-
-instance Integral Int where
-    rem x y = primIntRemainder x y
-
-showInt :: Int -> [Char]
-showInt i =
-    let
-        i2 = i `rem` 10
-    in showInt (i `rem` 7)
-",
-        );
-    }
-
-    #[test]
-    fn binding_pattern() {
-        compile(
-            r"
-test f (x:xs) = f x : test f xs
-test _ [] = []
-",
-        );
-    }
-
-    #[test]
-    fn newtype() {
-        //Test that the newtype constructor is newer constucted
-        let file = r"
-newtype Test a = Test [a]
-test = Test [1::Int]";
-        let assembly = compile(file);
-
-        let test = &assembly.super_combinators[0];
-        assert_eq!(
-            test.instructions,
-            vec![Pack(0, 0), PushInt(1), Pack(1, 2), Update(0), Unwind]
-        );
-    }
-
-    #[bench]
-    fn bench_prelude(b: &mut Bencher) {
-        use core::translate::translate_module;
-        use lambda_lift::do_lambda_lift;
-        use parser::Parser;
-        use renamer::tests::rename_module;
-
-        let path = &Path::new("Prelude.hs");
-        let mut contents = ::std::string::String::new();
-        File::open(path)
-            .and_then(|mut f| f.read_to_string(&mut contents))
-            .unwrap();
-        let mut parser = Parser::new(contents.chars());
-        let mut module = rename_module(parser.module().unwrap());
-        let mut type_env = TypeEnvironment::new();
-        type_env.typecheck_module_(&mut module);
-        let core_module = do_lambda_lift(translate_module(module));
-        b.iter(|| {
-            let mut compiler = Compiler::new();
-            compiler.compile_module(&core_module)
-        });
-    }
-}

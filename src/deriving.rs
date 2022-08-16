@@ -27,7 +27,7 @@ pub fn generate_deriving(instances: &mut Vec<Instance<Id<Name>>>, data: &DataDef
             "Ord" => {
                 let mut bindings = Vec::new();
                 let b = gen.generate_ord(data);
-                dbg!("Generated Ord {:?} ->>\n{:?}", &data.typ, &b);
+                tracing::debug!("Generated Ord {:?} ->>\n{:?}", &data.typ, &b);
                 bindings.push(b);
                 instances.push(Instance {
                     constraints: Vec::new(),

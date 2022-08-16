@@ -108,8 +108,7 @@ impl<T: fmt::Display> fmt::Display for Binding<T> {
 
 impl<T: fmt::Display> fmt::Display for Expr<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::Expr::*;
-        write_core_expr!(*self, f,)
+        module::macros::write_core_expr!(*self, f,)
     }
 }
 impl<T: fmt::Display> fmt::Display for Alternative<T> {
@@ -574,7 +573,7 @@ pub mod translate {
                     .is_none()
             })
             .map(|decl| {
-                dbg!(
+                tracing::debug!(
                     "Create default function for {} ({}) {}",
                     &instance.classname,
                     &instance.typ,
@@ -757,7 +756,7 @@ pub mod translate {
         ///Translates
         ///do { expr; stmts } = expr >> do { stmts; }
         fn do_bind2_id(&mut self, m_a: TcType, m_b: TcType) -> Expr<Id<Name>> {
-            dbg!("m_a {}", &m_a);
+            tracing::debug!("m_a {}", &m_a);
             let c = match *m_a.appl() {
                 Type::Variable(ref var) => vec![Constraint {
                     class: Name {
@@ -792,7 +791,7 @@ pub mod translate {
             let m_a = expr.get_type().clone();
             let a = m_a.appr().clone();
             let m_b = result.get_type().clone();
-            dbg!("m_a {}", &m_a);
+            tracing::debug!("m_a {}", &m_a);
             let c = match *m_a.appl() {
                 Type::Variable(ref var) => vec![Constraint {
                     class: Name {
@@ -1078,7 +1077,7 @@ pub mod translate {
                 .collect();
             let mut expr = self.translate_equations_(equations);
             expr = make_lambda(arg_ids.into_iter(), expr);
-            dbg!("Desugared {} :: {}\n {}", &name.name, &name.typ, &expr);
+            tracing::debug!("Desugared {} :: {}\n {}", &name.name, &name.typ, &expr);
             Binding {
                 name: name,
                 expression: expr,
@@ -1097,7 +1096,7 @@ pub mod translate {
                 eqs.push(Equation(ps.as_ref(), (bs.as_ref(), e)));
             }
             for e in eqs.iter() {
-                dbg!("{:?}", &e);
+                tracing::debug!("{:?}", &e);
             }
             self.translate_equations(eqs.as_ref())
         }
@@ -1140,7 +1139,7 @@ pub mod translate {
                     _ => true,
                 }
             }
-            dbg!("In {:?}", &equations);
+            tracing::debug!("In {:?}", &equations);
             let &Equation(ps, (where_bindings_bindings, e)) = &equations[0];
             if ps.len() == 0 {
                 assert_eq!(equations.len(), 1); //Otherwise multiple matches for this group
