@@ -703,8 +703,9 @@ pub fn extract_result(node: Node_) -> Option<VMResult> {
         }
         Int(i) => Some(VMResult::Int(i)),
         Float(i) => Some(VMResult::Double(i)),
+        // FIXME: recognizes strings as unextractable nodes
         x => {
-            println!("Can't extract result {:?}", x);
+            println!("Can't extract result:\n{:?}", x);
             None
         }
     }

@@ -24,3 +24,5 @@ bin
 tags
 
 target/
+# flamegraph
+*.svg

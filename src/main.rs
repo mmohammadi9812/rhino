@@ -1,16 +1,16 @@
 extern crate clap;
-use clap::{Command, arg};
+use clap::Parser;
+
+#[derive(Debug, Parser)]
+struct CliArgs {
+    #[clap(short = 'i', long, forbid_empty_values = true)]
+    input: String
+}
 
 fn main() {
     tracing_subscriber::fmt::init();
-    
-    let cmd = Command::new("rhino")
-    .about("A (mostly functional) haskell compiler in rust")
-    .version("0.2.0")
-    .arg_required_else_help(true)
-    .arg(arg!(<INPUT> "the input haskell file").required(true));
-    let matches = cmd.get_matches();
-    let fin = matches.get_one::<String>("input").expect("input file is required");
+
+    let fin = CliArgs::parse().input;
 
     let result = rhino::vm::execute_main_module(fin.as_ref()).unwrap();
     match result {
